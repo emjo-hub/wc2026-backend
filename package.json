@@ -1,0 +1,15 @@
+{
+  "name": "wc2026-backend",
+  "version": "1.0.0",
+  "main": "api/simulate.js",
+  "scripts": {
+    "start": "node api/simulate.js",
+    "build": "echo ok"
+  },
+  "dependencies": {
+    "pg": "^8.11.3"
+  },
+  "engines": {
+    "node": "20.x"
+  }
+}
