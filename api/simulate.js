@@ -42,9 +42,8 @@ module.exports = async function handler(req, res) {
     const SCALE=1.40, ef=Math.max(-0.8,Math.min(0.8,(ta.elo-tb.elo)/600));
     const dA=1+Math.min(0.15,Math.max(-0.15,(tb.ppda-10)/40));
     const dB=1+Math.min(0.15,Math.max(-0.15,(ta.ppda-10)/40));
-    const muA=Math.max(0.4,parseFloat(((ta.xg_avg*(1+ef*0.35)*1.06*SCALE*dA)+(ta.set_piece_xg*Math.max(0.8,1-ta.ppda/35)*SCALE*0.5))*ctx).toFixed(3));
-    const muB=Math.max(0.35,parseFloat(((tb.xg_avg*(1-ef*0.35)*SCALE*dB)+(tb.set_piece_xg*Math.max(0.8,1-tb.ppda/35)*SCALE*0.5))*ctx).toFixed(3));
-
+    const muA=Math.max(0.4,parseFloat(((ta.xg_recent*(1+ef*0.35)*1.06*SCALE*dA)+(ta.set_piece_xg*Math.max(0.8,1-ta.ppda/35)*SCALE*0.5))*ctx).toFixed(3));
+    const muB=Math.max(0.35,parseFloat(((tb.xg_recent*(1-ef*0.35)*SCALE*dB)+(tb.set_piece_xg*Math.max(0.8,1-tb.ppda/35)*SCALE*0.5))*ctx).toFixed(3));
     const matrix=dcMatrix(muA,muB);
     const {ga,gb}=sampleMat(matrix);
     const corners=simCorners(ta,tb);
