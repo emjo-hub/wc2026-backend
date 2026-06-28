@@ -13,12 +13,14 @@ module.exports = async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
   try {
-    const { muA, muB, n = 10000 } = req.body;
-    const matrix = dcMatrix(muA, muB);
+    const { muA, muB, n = 25000 } = req.body;
     let winsA=0, draws=0, winsB=0;
     const sf={};
     for (let i=0;i<n;i++) {
-      const {ga,gb}=sampleMat(matrix);
+        const noisyMuA = muA * (0.82 + Math.random() * 0.36);
+        const noisyMuB = muB * (0.82 + Math.random() * 0.36);
+        const noisyMatrix = dcMatrix(noisyMuA, noisyMuB);
+      const {ga,gb}=sampleMat(noisyMatrix);
       if(ga>gb)winsA++;else if(ga<gb)winsB++;else draws++;
       const k=`${ga}-${gb}`;sf[k]=(sf[k]||0)+1;
     }
