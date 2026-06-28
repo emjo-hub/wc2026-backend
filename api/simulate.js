@@ -39,8 +39,23 @@ module.exports = async function handler(req, res) {
     if (!tb) return res.status(404).json({ error: `Equipo no encontrado: ${teamB}` });
 
     const ctx = (context.weather||1)*(context.phase||1)*(context.rest||1);
-    const ef = Math.max(-0.8, Math.min(0.8, (ta.elo - tb.elo) / 600));
+    // Elo dinámico basado en rendimiento del torneo
+    const K = 60;
+    const eloBase_a = ta.elo;
+    const eloBase_b = tb.elo;
+    const matchesA = ta.matchday || 0;
+    const matchesB = tb.matchday || 0;
+    const winRateA = matchesA > 0 ? ta.points / (matchesA * 3) : 0.5;
+    const winRateB = matchesB > 0 ? tb.points / (matchesB * 3) : 0.5;
+    const expectedA = 1 / (1 + Math.pow(10, (eloBase_b - eloBase_a) / 400));
+    const eloAdjA = Math.round(K * matchesA * (winRateA - expectedA));
+    const eloAdjB = Math.round(K * matchesB * (winRateB - expectedA));
+    const elo_a = eloBase_a + eloAdjA;
+    const elo_b = eloBase_b + eloAdjB;
+    const eloP = eloProbs(elo_a, elo_b);
 
+    // Lambdas con Elo dinámico
+    const ef = Math.max(-0.8, Math.min(0.8, (elo_a - elo_b) / 600));
     const xg_a = parseFloat(ta.xg_recent || ta.xg_avg || 1.2);
     const xg_b = parseFloat(tb.xg_recent || tb.xg_avg || 1.2);
     const pts_a = parseFloat(ta.points || 0);
@@ -48,16 +63,15 @@ module.exports = async function handler(req, res) {
 
     let raw_a = Math.max(0.3, (xg_a * 0.5) + (ef * 0.4) + (pts_a * 0.05));
     let raw_b = Math.max(0.3, (xg_b * 0.5) - (ef * 0.4) + (pts_b * 0.05));
-
+    
     const total_raw = raw_a + raw_b;
     const TARGET = 2.60;
     const muA = Math.max(0.4, parseFloat((raw_a / total_raw * TARGET * ctx).toFixed(3)));
     const muB = Math.max(0.35, parseFloat((raw_b / total_raw * TARGET * ctx).toFixed(3)));
 
-    const matrix=dcMatrix(muA,muB);
-    const {ga,gb}=sampleMat(matrix);
-    const corners=simCorners(ta,tb);
-    const eloP=eloProbs(ta.elo,tb.elo);
+    const matrix = dcMatrix(muA, muB);
+    const {ga, gb} = sampleMat(matrix);
+    const corners = simCorners(ta, tb);
     const rand=(a,b)=>Math.floor(Math.random()*(b-a+1))+a;
     const ev=[];
     const pA=[ta.star_player,'Delantero','Mediocampista','Extremo','Defensa SP'];
