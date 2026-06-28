@@ -61,9 +61,9 @@ module.exports = async function handler(req, res) {
     const pts_a = parseFloat(ta.points || 0);
     const pts_b = parseFloat(tb.points || 0);
 
-    let raw_a = Math.max(0.3, (xg_a * 0.5) + (ef * 0.4) + (pts_a * 0.05));
-    let raw_b = Math.max(0.3, (xg_b * 0.5) - (ef * 0.4) + (pts_b * 0.05));
-    
+    let raw_a = Math.max(0.3, (xg_a * 0.6) + (ef * 0.25) + (pts_a * 0.06));
+    let raw_b = Math.max(0.3, (xg_b * 0.6) - (ef * 0.25) + (pts_b * 0.06));
+
     const total_raw = raw_a + raw_b;
     const TARGET = 2.60;
     const muA = Math.max(0.4, parseFloat((raw_a / total_raw * TARGET * ctx).toFixed(3)));
