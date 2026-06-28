@@ -10,6 +10,21 @@ function poissonPMF(l,k){if(k<0||l<=0)return k===0?1:0;let lp=-l+k*Math.log(l);f
 function dcTau(x,y,mA,mB){const r=-0.13;if(x===0&&y===0)return 1-mA*mB*r;if(x===0&&y===1)return 1+mA*r;if(x===1&&y===0)return 1+mB*r;if(x===1&&y===1)return 1-r;return 1;}
 function dcMatrix(mA,mB){const m=[];for(let i=0;i<=7;i++){m[i]=[];for(let j=0;j<=7;j++)m[i][j]=dcTau(i,j,mA,mB)*poissonPMF(mA,i)*poissonPMF(mB,j);}let t=0;for(let i=0;i<=7;i++)for(let j=0;j<=7;j++)t+=m[i][j];for(let i=0;i<=7;i++)for(let j=0;j<=7;j++)m[i][j]/=t;return m;}
 function sampleMat(mat){let r=Math.random(),c=0;for(let i=0;i<mat.length;i++)for(let j=0;j<mat[i].length;j++){c+=mat[i][j];if(r<c)return{ga:i,gb:j};}return{ga:1,gb:1};}
+function simPenalties(ta, tb) {
+  // Probabilidad base de ganar penales: 50/50 ajustada por Elo
+  const eloAdv = Math.max(-0.1, Math.min(0.1, (ta.elo - tb.elo) / 4000));
+  const probA = 0.50 + eloAdv;
+  return Math.random() < probA ? 'a' : 'b';
+}
+
+function simExtraTime(muA, muB) {
+  // En prórroga los equipos están cansados — reducimos lambdas 40%
+  const etMuA = muA * 0.6;
+  const etMuB = muB * 0.6;
+  const mat = dcMatrix(etMuA, etMuB);
+  const { ga, gb } = sampleMat(mat);
+  return { ga, gb };
+}
 function eloProbs(eA,eB){const pW=1/(1+Math.pow(10,(eB-eA+50)/400));const pD=Math.max(0.10,Math.min(0.30,0.22+0.10*(1-Math.abs(pW-0.5)*2.2)));return{win:+pW.toFixed(4),draw:+pD.toFixed(4),lose:+Math.max(0,1-pW-pD).toFixed(4)};}
 function pSample(l){if(l<=0)return 0;let L=Math.exp(-l),k=0,p=1;do{k++;p*=Math.random();}while(p>L&&k<25);return k-1;}
 function simCorners(ta,tb){const pfA=Math.max(0.85,1-ta.ppda/30),pfB=Math.max(0.85,1-tb.ppda/30);const c1a=pSample(Math.max(0.5,(ta.possession_avg/100)*5.8*pfA+0.3)),c2a=pSample(Math.max(0.5,(ta.possession_avg/100)*5.5*pfA+0.2)),c1b=pSample(Math.max(0.5,(tb.possession_avg/100)*5.3*pfB)),c2b=pSample(Math.max(0.5,(tb.possession_avg/100)*5.5*pfB));return{c1a,c2a,cta:c1a+c2a,c1b,c2b,ctb:c1b+c2b,total:c1a+c2a+c1b+c2b};}
@@ -81,8 +96,36 @@ module.exports = async function handler(req, res) {
     ev.sort((a,b)=>a.min-b.min);
     const eloRatio=ta.elo/(ta.elo+tb.elo),possA=Math.round(Math.max(28,Math.min(72,ta.possession_avg*(0.92+eloRatio*0.16))));
 
+    // Lógica eliminatoria
+    let finalGa = ga, finalGb = gb;
+    let extraTime = false, penalties = false, penaltyWinner = null;
+    const isKnockout = (context.phase || 1) >= 1.05;
+
+    if (isKnockout && ga === gb) {
+      extraTime = true;
+      const etMuA = muA * 0.6;
+      const etMuB = muB * 0.6;
+      const etMat = dcMatrix(etMuA, etMuB);
+      const et = sampleMat(etMat);
+      finalGa += et.ga;
+      finalGb += et.gb;
+
+      if (finalGa === finalGb) {
+        penalties = true;
+        const eloAdv = Math.max(-0.1, Math.min(0.1, (ta.elo - tb.elo) / 4000));
+        penaltyWinner = Math.random() < (0.50 + eloAdv) ? 'a' : 'b';
+      }
+    }
+
     res.status(200).json({
-      result:{ga,gb},
+      result:{
+        ga: finalGa,
+        gb: finalGb,
+        extraTime,
+        penalties,
+        penaltyWinner,
+        winner: finalGa > finalGb ? 'a' : finalGb > finalGa ? 'b' : penaltyWinner
+      },
       teams:{a:{name:teamA,flag:ta.flag,elo:ta.elo,rank:ta.fifa_rank},b:{name:teamB,flag:tb.flag,elo:tb.elo,rank:tb.fifa_rank}},
       model:{muA,muB,expectedGoals:+(muA+muB).toFixed(2),eloProbs:eloP},
       matrix:matrix.slice(0,5).map(r=>r.slice(0,5)),
