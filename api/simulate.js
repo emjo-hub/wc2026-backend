@@ -27,8 +27,7 @@ function simExtraTime(muA, muB) {
 }
 function eloProbs(eA,eB){const pW=1/(1+Math.pow(10,(eB-eA+50)/400));const pD=Math.max(0.10,Math.min(0.30,0.22+0.10*(1-Math.abs(pW-0.5)*2.2)));return{win:+pW.toFixed(4),draw:+pD.toFixed(4),lose:+Math.max(0,1-pW-pD).toFixed(4)};}
 function pSample(l){if(l<=0)return 0;let L=Math.exp(-l),k=0,p=1;do{k++;p*=Math.random();}while(p>L&&k<25);return k-1;}
-function simCorners(ta,tb){const pfA=Math.max(0.85,1-ta.ppda/30),pfB=Math.max(0.85,1-tb.ppda/30);const c1a=pSample(Math.max(0.5,(ta.possession_avg/100)*5.8*pfA+0.3)),c2a=pSample(Math.max(0.5,(ta.possession_avg/100)*5.5*pfA+0.2)),c1b=pSample(Math.max(0.5,(tb.possession_avg/100)*5.3*pfB)),c2b=pSample(Math.max(0.5,(tb.possession_avg/100)*5.5*pfB));return{c1a,c2a,cta:c1a+c2a,c1b,c2b,ctb:c1b+c2b,total:c1a+c2a+c1b+c2b};}
-
+function simCorners(ta,tb){const pfA=Math.max(0.85,1-ta.ppda/30),pfB=Math.max(0.85,1-tb.ppda/30);const c1a=pSample(Math.max(0.3,(ta.possession_avg/100)*2.8*pfA+0.2)),c2a=pSample(Math.max(0.3,(ta.possession_avg/100)*2.6*pfA+0.1)),c1b=pSample(Math.max(0.3,(tb.possession_avg/100)*2.5*pfB)),c2b=pSample(Math.max(0.3,(tb.possession_avg/100)*2.6*pfB));return{c1a,c2a,cta:c1a+c2a,c1b,c2b,ctb:c1b+c2b,total:c1a+c2a+c1b+c2b};}
 module.exports = async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
