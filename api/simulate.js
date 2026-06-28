@@ -39,11 +39,18 @@ module.exports = async function handler(req, res) {
     if (!tb) return res.status(404).json({ error: `Equipo no encontrado: ${teamB}` });
 
     const ctx = (context.weather||1)*(context.phase||1)*(context.rest||1);
-    const SCALE=1.05, ef=Math.max(-0.8,Math.min(0.8,(ta.elo-tb.elo)/600));
-    const dA=1+Math.min(0.15,Math.max(-0.15,(tb.ppda-10)/40));
-    const dB=1+Math.min(0.15,Math.max(-0.15,(ta.ppda-10)/40));
-    const muA=Math.max(0.4,parseFloat(((ta.xg_recent*(1+ef*0.35)*1.06*SCALE*dA)+(ta.set_piece_xg*Math.max(0.8,1-ta.ppda/35)*SCALE*0.5))*ctx).toFixed(3));
-    const muB=Math.max(0.35,parseFloat(((tb.xg_recent*(1-ef*0.35)*SCALE*dB)+(tb.set_piece_xg*Math.max(0.8,1-tb.ppda/35)*SCALE*0.5))*ctx).toFixed(3));
+    const ef = Math.max(-0.8, Math.min(0.8, (ta.elo - tb.elo) / 600));
+    const xg_ratio = ta.xg_recent / (tb.xg_recent + 0.01);
+    const ppda_diff = ta.ppda - tb.ppda;
+
+    let raw_a = (ta.xg_recent * 0.45) + (ef * 0.35) + (xg_ratio * 0.12) + (ta.points * 0.04) - (ppda_diff * 0.02);
+    let raw_b = (tb.xg_recent * 0.45) - (ef * 0.35) + (1/xg_ratio * 0.12) + (tb.points * 0.04) + (ppda_diff * 0.02);
+
+    const total_raw = raw_a + raw_b;
+    const TARGET = 2.60;
+    const muA = Math.max(0.4, parseFloat((raw_a / total_raw * TARGET * ctx).toFixed(3)));
+    const muB = Math.max(0.35, parseFloat((raw_b / total_raw * TARGET * ctx).toFixed(3)));
+
     const matrix=dcMatrix(muA,muB);
     const {ga,gb}=sampleMat(matrix);
     const corners=simCorners(ta,tb);
