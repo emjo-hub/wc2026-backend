@@ -13,7 +13,7 @@ module.exports = async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
   try {
-    const { muA, muB, n = 25000 } = req.body;
+    const { muA, muB, n = 50000 } = req.body;
     let winsA=0, draws=0, winsB=0;
     const sf={};
     for (let i=0;i<n;i++) {
@@ -24,13 +24,14 @@ module.exports = async function handler(req, res) {
       if(ga>gb)winsA++;else if(ga<gb)winsB++;else draws++;
       const k=`${ga}-${gb}`;sf[k]=(sf[k]||0)+1;
     }
-    res.status(200).json({
-      n,
-      probabilities:{winA:+(winsA/n*100).toFixed(1),draw:+(draws/n*100).toFixed(1),winB:+(winsB/n*100).toFixed(1)},
-      topScores:Object.entries(sf).sort((a,b)=>b[1]-a[1]).slice(0,8).map(([score,count])=>({score,pct:+(count/n*100).toFixed(1)})),
-      expectedGoals:+(muA+muB).toFixed(2),
-    });
-  } catch(err) {
-    res.status(500).json({ error: err.message });
-  }
-};
+const topScores = Object.entries(sf).sort((a,b)=>b[1]-a[1]).slice(0,8).map(([score,count])=>({score,pct:+(count/n*100).toFixed(1)}));
+const mostLikely = topScores[0]?.score || '1-0';
+const [mlA, mlB] = mostLikely.split('-').map(Number);
+
+res.status(200).json({
+  n,
+  probabilities:{winA:+(winsA/n*100).toFixed(1),draw:+(draws/n*100).toFixed(1),winB:+(winsB/n*100).toFixed(1)},
+  topScores,
+  expectedGoals:+(muA+muB).toFixed(2),
+  mostLikelyScore:{ ga: mlA, gb: mlB, score: mostLikely, pct: topScores[0]?.pct }
+});
