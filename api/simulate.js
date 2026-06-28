@@ -40,11 +40,11 @@ module.exports = async function handler(req, res) {
 
     const ctx = (context.weather||1)*(context.phase||1)*(context.rest||1);
     const ef = Math.max(-0.8, Math.min(0.8, (ta.elo - tb.elo) / 600));
-    const xg_ratio = ta.xg_recent / (tb.xg_recent + 0.01);
+    const xg_ratio = Math.max(0.1, ta.xg_recent / (tb.xg_recent + 0.01));
     const ppda_diff = ta.ppda - tb.ppda;
 
-    let raw_a = (ta.xg_recent * 0.45) + (ef * 0.35) + (xg_ratio * 0.12) + (ta.points * 0.04) - (ppda_diff * 0.02);
-    let raw_b = (tb.xg_recent * 0.45) - (ef * 0.35) + (1/xg_ratio * 0.12) + (tb.points * 0.04) + (ppda_diff * 0.02);
+    let raw_a = Math.max(0.3, (ta.xg_recent * 0.5) + (ef * 0.4) + (ta.points * 0.05));
+    let raw_b = Math.max(0.3, (tb.xg_recent * 0.5) - (ef * 0.4) + (tb.points * 0.05));
 
     const total_raw = raw_a + raw_b;
     const TARGET = 2.60;
