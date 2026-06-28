@@ -17,21 +17,24 @@ module.exports = async function handler(req, res) {
     let winsA=0, draws=0, winsB=0;
     const sf={};
     for (let i=0;i<n;i++) {
-        const noisyMuA = muA * (0.82 + Math.random() * 0.36);
-        const noisyMuB = muB * (0.82 + Math.random() * 0.36);
-        const noisyMatrix = dcMatrix(noisyMuA, noisyMuB);
+      const noisyMuA = muA * (0.82 + Math.random() * 0.36);
+      const noisyMuB = muB * (0.82 + Math.random() * 0.36);
+      const noisyMatrix = dcMatrix(noisyMuA, noisyMuB);
       const {ga,gb}=sampleMat(noisyMatrix);
       if(ga>gb)winsA++;else if(ga<gb)winsB++;else draws++;
       const k=`${ga}-${gb}`;sf[k]=(sf[k]||0)+1;
     }
-const topScores = Object.entries(sf).sort((a,b)=>b[1]-a[1]).slice(0,8).map(([score,count])=>({score,pct:+(count/n*100).toFixed(1)}));
-const mostLikely = topScores[0]?.score || '1-0';
-const [mlA, mlB] = mostLikely.split('-').map(Number);
-
-res.status(200).json({
-  n,
-  probabilities:{winA:+(winsA/n*100).toFixed(1),draw:+(draws/n*100).toFixed(1),winB:+(winsB/n*100).toFixed(1)},
-  topScores,
-  expectedGoals:+(muA+muB).toFixed(2),
-  mostLikelyScore:{ ga: mlA, gb: mlB, score: mostLikely, pct: topScores[0]?.pct }
-});
+    const topScores = Object.entries(sf).sort((a,b)=>b[1]-a[1]).slice(0,8).map(([score,count])=>({score,pct:+(count/n*100).toFixed(1)}));
+    const mostLikely = topScores[0]?.score || '1-0';
+    const [mlA, mlB] = mostLikely.split('-').map(Number);
+    res.status(200).json({
+      n,
+      probabilities:{winA:+(winsA/n*100).toFixed(1),draw:+(draws/n*100).toFixed(1),winB:+(winsB/n*100).toFixed(1)},
+      topScores,
+      expectedGoals:+(muA+muB).toFixed(2),
+      mostLikelyScore:{ ga: mlA, gb: mlB, score: mostLikely, pct: topScores[0]?.pct }
+    });
+  } catch(err) {
+    res.status(500).json({ error: err.message });
+  }
+};
