@@ -50,7 +50,7 @@ module.exports = async function handler(req, res) {
     const TARGET = 2.60;
     const muA = Math.max(0.4, parseFloat((raw_a / total_raw * TARGET * ctx).toFixed(3)));
     const muB = Math.max(0.35, parseFloat((raw_b / total_raw * TARGET * ctx).toFixed(3)));
-
+    console.log('DEBUG muA:', muA, 'muB:', muB, 'raw_a:', raw_a, 'raw_b:', raw_b);
     const matrix=dcMatrix(muA,muB);
     const {ga,gb}=sampleMat(matrix);
     const corners=simCorners(ta,tb);
