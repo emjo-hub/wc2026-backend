@@ -40,17 +40,20 @@ module.exports = async function handler(req, res) {
 
     const ctx = (context.weather||1)*(context.phase||1)*(context.rest||1);
     const ef = Math.max(-0.8, Math.min(0.8, (ta.elo - tb.elo) / 600));
-    const xg_ratio = Math.max(0.1, ta.xg_recent / (tb.xg_recent + 0.01));
-    const ppda_diff = ta.ppda - tb.ppda;
 
-    let raw_a = Math.max(0.3, (ta.xg_recent * 0.5) + (ef * 0.4) + (ta.points * 0.05));
-    let raw_b = Math.max(0.3, (tb.xg_recent * 0.5) - (ef * 0.4) + (tb.points * 0.05));
+    const xg_a = parseFloat(ta.xg_recent || ta.xg_avg || 1.2);
+    const xg_b = parseFloat(tb.xg_recent || tb.xg_avg || 1.2);
+    const pts_a = parseFloat(ta.points || 0);
+    const pts_b = parseFloat(tb.points || 0);
+
+    let raw_a = Math.max(0.3, (xg_a * 0.5) + (ef * 0.4) + (pts_a * 0.05));
+    let raw_b = Math.max(0.3, (xg_b * 0.5) - (ef * 0.4) + (pts_b * 0.05));
 
     const total_raw = raw_a + raw_b;
     const TARGET = 2.60;
     const muA = Math.max(0.4, parseFloat((raw_a / total_raw * TARGET * ctx).toFixed(3)));
     const muB = Math.max(0.35, parseFloat((raw_b / total_raw * TARGET * ctx).toFixed(3)));
-    console.log('DEBUG muA:', muA, 'muB:', muB, 'raw_a:', raw_a, 'raw_b:', raw_b);
+    console.log('DEBUG muA:', muA, 'muB:', muB);
     const matrix=dcMatrix(muA,muB);
     const {ga,gb}=sampleMat(matrix);
     const corners=simCorners(ta,tb);
