@@ -13,7 +13,7 @@ module.exports = async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
   try {
-    const { muA, muB, n = 50000 } = req.body;
+    const { muA, muB, n = 25000 } = req.body;
     let winsA=0, draws=0, winsB=0;
     const sf={};
     for (let i=0;i<n;i++) {
