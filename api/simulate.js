@@ -73,11 +73,13 @@ module.exports = async function handler(req, res) {
     const ef = Math.max(-0.8, Math.min(0.8, (elo_a - elo_b) / 600));
     const xg_a = parseFloat(ta.xg_recent || ta.xg_avg || 1.2);
     const xg_b = parseFloat(tb.xg_recent || tb.xg_avg || 1.2);
+    const xgDef_a = parseFloat(tb.xga_avg || 1.2);
+    const xgDef_b = parseFloat(ta.xga_avg || 1.2);
     const pts_a = parseFloat(ta.points || 0);
     const pts_b = parseFloat(tb.points || 0);
 
-    let raw_a = Math.max(0.3, (xg_a * 0.6) + (ef * 0.25) + (pts_a * 0.06));
-    let raw_b = Math.max(0.3, (xg_b * 0.6) - (ef * 0.25) + (pts_b * 0.06));
+    let raw_a = Math.max(0.3, (xg_a * 0.45) + (xgDef_a * 0.20) + (ef * 0.20) + (pts_a * 0.04));
+    let raw_b = Math.max(0.3, (xg_b * 0.45) + (xgDef_b * 0.20) - (ef * 0.20) + (pts_b * 0.04));
 
     const total_raw = raw_a + raw_b;
     const TARGET = 2.60;
