@@ -13,27 +13,55 @@ module.exports = async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
   try {
-    const { muA, muB, n = 50000 } = req.body;
-    let winsA=0, draws=0, winsB=0;
-    const sf={};
-    for (let i=0;i<n;i++) {
-      const noisyMuA = muA * (0.82 + Math.random() * 0.36);
-      const noisyMuB = muB * (0.82 + Math.random() * 0.36);
-      const noisyMatrix = dcMatrix(noisyMuA, noisyMuB);
-      const {ga,gb}=sampleMat(noisyMatrix);
-      if(ga>gb)winsA++;else if(ga<gb)winsB++;else draws++;
-      const k=`${ga}-${gb}`;sf[k]=(sf[k]||0)+1;
+const { muA, muB, n = 50000, isKnockout = false, eloA = 1800, eloB = 1800 } = req.body;
+let winsA=0, draws=0, winsB=0;
+const sf={};
+
+for (let i=0;i<n;i++) {
+  const noisyMuA = muA * (0.82 + Math.random() * 0.36);
+  const noisyMuB = muB * (0.82 + Math.random() * 0.36);
+  const noisyMatrix = dcMatrix(noisyMuA, noisyMuB);
+  let {ga,gb} = sampleMat(noisyMatrix);
+
+  if (isKnockout && ga === gb) {
+    // Prórroga — lambdas reducidos 40%
+    const etMuA = noisyMuA * 0.6;
+    const etMuB = noisyMuB * 0.6;
+    const etMat = dcMatrix(etMuA, etMuB);
+    const et = sampleMat(etMat);
+    ga += et.ga;
+    gb += et.gb;
+
+    // Penales si sigue empatado
+    if (ga === gb) {
+      const eloAdv = Math.max(-0.1, Math.min(0.1, (eloA - eloB) / 4000));
+      if (Math.random() < 0.50 + eloAdv) ga += 0.1;
+      else gb += 0.1;
     }
-    const topScores = Object.entries(sf).sort((a,b)=>b[1]-a[1]).slice(0,8).map(([score,count])=>({score,pct:+(count/n*100).toFixed(1)}));
-    const mostLikely = topScores[0]?.score || '1-0';
-    const [mlA, mlB] = mostLikely.split('-').map(Number);
-    res.status(200).json({
-      n,
-      probabilities:{winA:+(winsA/n*100).toFixed(1),draw:+(draws/n*100).toFixed(1),winB:+(winsB/n*100).toFixed(1)},
-      topScores,
-      expectedGoals:+(muA+muB).toFixed(2),
-      mostLikelyScore:{ ga: mlA, gb: mlB, score: mostLikely, pct: topScores[0]?.pct }
-    });
+  }
+
+  const finalGa = Math.floor(ga);
+  const finalGb = Math.floor(gb);
+
+  if (finalGa > finalGb) winsA++;
+  else if (finalGa < finalGb) winsB++;
+  else draws++;
+
+  const k=`${finalGa}-${finalGb}`;sf[k]=(sf[k]||0)+1;
+}
+
+const topScores = Object.entries(sf).sort((a,b)=>b[1]-a[1]).slice(0,8).map(([score,count])=>({score,pct:+(count/n*100).toFixed(1)}));
+const mostLikely = topScores[0]?.score || '1-0';
+const [mlA, mlB] = mostLikely.split('-').map(Number);
+
+res.status(200).json({
+  n,
+  isKnockout,
+  probabilities:{winA:+(winsA/n*100).toFixed(1),draw:+(draws/n*100).toFixed(1),winB:+(winsB/n*100).toFixed(1)},
+  topScores,
+  expectedGoals:+(muA+muB).toFixed(2),
+  mostLikelyScore:{ ga: mlA, gb: mlB, score: mostLikely, pct: topScores[0]?.pct }
+});
   } catch(err) {
     res.status(500).json({ error: err.message });
   }
