@@ -103,7 +103,7 @@ const xg_b = Math.max(0.3, weightedXG(tb));
     let raw_b = Math.max(0.3, (xg_b * 0.45) + (xgDef_b * 0.20) - (ef * 0.20) + (pts_b * 0.04));
 
     const total_raw = raw_a + raw_b;
-    const phase = context.phase || 1;
+    const phase = parseFloat(context.phase || 1);
 const TARGET = phase >= 1.12 ? 2.35 : phase >= 1.08 ? 2.45 : phase >= 1.05 ? 2.52 : 2.60;
     const muA = Math.max(0.4, parseFloat((raw_a / total_raw * TARGET * ctx).toFixed(3)));
     const muB = Math.max(0.35, parseFloat((raw_b / total_raw * TARGET * ctx).toFixed(3)));
