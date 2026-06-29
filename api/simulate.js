@@ -40,14 +40,21 @@ module.exports = async function handler(req, res) {
     if (!teamA || !teamB) return res.status(400).json({ error: 'Faltan equipos' });
     if (teamA === teamB) return res.status(400).json({ error: 'Los equipos deben ser diferentes' });
 
-    const { rows } = await pool.query(`
-      SELECT t.*, COALESCE(ts.xg_last_5, t.xg_avg) AS xg_recent,
-ts.xg_match1, ts.xg_match2, ts.xg_match3, ts.xg_match4,
-COALESCE(ts.matchday, 0) AS matchday,
-        COALESCE(ts.goals_scored,0) AS goals_scored, COALESCE(ts.points,0) AS points
-      FROM teams t LEFT JOIN team_tournament_stats ts ON ts.team_name = t.name
-      WHERE LOWER(t.name) IN (LOWER($1), LOWER($2))
-    `, [teamA, teamB]);
+const { rows } = await pool.query(`
+    SELECT 
+    t.name, t.elo, t.fifa_rank, t.flag, t.confederation,
+    t.xg_avg, t.xga_avg, t.ppda, t.possession_avg,
+    t.shots_avg, t.set_piece_xg, t.star_player, t.wc_appearances,
+    t.recent_form,
+    COALESCE(ts.xg_last_5, t.xg_avg) AS xg_recent,
+    COALESCE(ts.goals_scored, 0) AS goals_scored,
+    COALESCE(ts.points, 0) AS points,
+    COALESCE(ts.matchday, 0) AS matchday,
+    ts.xg_match1, ts.xg_match2, ts.xg_match3, ts.xg_match4
+  FROM teams t 
+  LEFT JOIN team_tournament_stats ts ON ts.team_name = t.name
+  WHERE LOWER(t.name) IN (LOWER($1), LOWER($2))
+`, [teamA, teamB]);
 
     const ta = rows.find(r => r.name.toLowerCase() === teamA.toLowerCase());
     const tb = rows.find(r => r.name.toLowerCase() === teamB.toLowerCase());
