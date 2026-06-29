@@ -140,6 +140,14 @@ const xg_b = Math.max(0.3, weightedXG(tb));
       }
     }
 
+    // Guardar simulación en historial
+try {
+  await pool.query(`
+    INSERT INTO simulation_history 
+    (team_a, team_b, goals_a, goals_b, mu_a, mu_b, phase, extra_time, penalties, penalty_winner, model_used, created_at)
+    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 'xgboost-dc-v2', NOW())
+  `, [teamA, teamB, finalGa, finalGb, muA, muB, context.phase||1, extraTime, penalties, penaltyWinner]);
+} catch(e) { console.error('History error:', e.message); }
     res.status(200).json({
       result:{
         ga: finalGa,
