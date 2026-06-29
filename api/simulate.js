@@ -42,6 +42,8 @@ module.exports = async function handler(req, res) {
 
     const { rows } = await pool.query(`
       SELECT t.*, COALESCE(ts.xg_last_5, t.xg_avg) AS xg_recent,
+ts.xg_match1, ts.xg_match2, ts.xg_match3, ts.xg_match4,
+COALESCE(ts.matchday, 0) AS matchday,
         COALESCE(ts.goals_scored,0) AS goals_scored, COALESCE(ts.points,0) AS points
       FROM teams t LEFT JOIN team_tournament_stats ts ON ts.team_name = t.name
       WHERE LOWER(t.name) IN (LOWER($1), LOWER($2))
@@ -70,8 +72,20 @@ module.exports = async function handler(req, res) {
 
     // Lambdas con Elo dinámico
     const ef = Math.max(-0.8, Math.min(0.8, (elo_a - elo_b) / 600));
-    const xg_a = parseFloat(ta.xg_recent || ta.xg_avg || 1.2);
-    const xg_b = parseFloat(tb.xg_recent || tb.xg_avg || 1.2);
+    // Forma reciente ponderada
+function weightedXG(t) {
+  const m = t.matchday || 0;
+  const m1 = parseFloat(t.xg_match1 || 0);
+  const m2 = parseFloat(t.xg_match2 || 0);
+  const m3 = parseFloat(t.xg_match3 || 0);
+  const m4 = parseFloat(t.xg_match4 || 0);
+  if (m >= 4) return (m1*0.10 + m2*0.20 + m3*0.30 + m4*0.40);
+  if (m === 3) return (m1*0.20 + m2*0.35 + m3*0.45);
+  if (m === 2) return (m1*0.40 + m2*0.60);
+  return parseFloat(t.xg_recent || t.xg_avg || 1.2);
+}
+const xg_a = Math.max(0.3, weightedXG(ta));
+const xg_b = Math.max(0.3, weightedXG(tb));
     const xgDef_a = parseFloat(tb.xga_avg || 1.2);
     const xgDef_b = parseFloat(ta.xga_avg || 1.2);
     const pts_a = parseFloat(ta.points || 0);
