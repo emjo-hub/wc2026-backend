@@ -71,6 +71,7 @@ COALESCE(ts.matchday, 0) AS matchday,
     const eloP = eloProbs(elo_a, elo_b);
 
     // Lambdas con Elo dinámico
+    console.log('DEBUG:', ta.name, 'matchday:', ta.matchday, 'xg_match1:', ta.xg_match1, 'xg_match2:', ta.xg_match2, 'xg_match3:', ta.xg_match3);
     const ef = Math.max(-0.8, Math.min(0.8, (elo_a - elo_b) / 600));
     // Forma reciente ponderada
 function weightedXG(t) {
