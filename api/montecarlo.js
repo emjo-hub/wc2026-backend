@@ -13,7 +13,7 @@ module.exports = async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
   try {
-const { muA, muB, n = 50000, isKnockout = false, eloA = 1800, eloB = 1800 } = req.body;
+const { muA, muB, n = 50000, isKnockout = false, eloA = 1800, eloB = 1800, possA = 50, possB = 50, ppdaA = 10, ppdaB = 10 } = req.body;
 let winsA=0, draws=0, winsB=0;
 const sf={};
 
@@ -54,15 +54,43 @@ const topScores = Object.entries(sf).sort((a,b)=>b[1]-a[1]).slice(0,8).map(([sco
 const mostLikely = topScores[0]?.score || '1-0';
 const [mlA, mlB] = mostLikely.split('-').map(Number);
 
+// Corner Carlo — 50k simulaciones de corners
+function pSample(l){if(l<=0)return 0;let L=Math.exp(-l),k=0,p=1;do{k++;p*=Math.random();}while(p>L&&k<25);return k-1;}
+
+const cornerTotals = {};
+const cornerA = {};
+const cornerB = {};
+
+for(let i=0;i<n;i++){
+  const pfA = Math.max(0.85, 1-(ppdaA/30));
+  const pfB = Math.max(0.85, 1-(ppdaB/30));
+  const ca = pSample(Math.max(0.2,(possA/100)*1.8*pfA)) + pSample(Math.max(0.2,(possA/100)*1.6*pfA));
+  const cb = pSample(Math.max(0.2,(possB/100)*1.6*pfB)) + pSample(Math.max(0.2,(possB/100)*1.8*pfB));
+  const total = ca + cb;
+  const kt = `${total}`;
+  const ka = `${ca}`;
+  const kb = `${cb}`;
+  cornerTotals[kt] = (cornerTotals[kt]||0)+1;
+  cornerA[ka] = (cornerA[ka]||0)+1;
+  cornerB[kb] = (cornerB[kb]||0)+1;
+}
+
+const topCornerTotals = Object.entries(cornerTotals).sort((a,b)=>b[1]-a[1]).slice(0,6).map(([v,c])=>({value:+v,pct:+(c/n*100).toFixed(1)}));
+const topCornersA = Object.entries(cornerA).sort((a,b)=>b[1]-a[1]).slice(0,4).map(([v,c])=>({value:+v,pct:+(c/n*100).toFixed(1)}));
+const topCornersB = Object.entries(cornerB).sort((a,b)=>b[1]-a[1]).slice(0,4).map(([v,c])=>({value:+v,pct:+(c/n*100).toFixed(1)}));
+const mostLikelyCorners = topCornerTotals[0]?.value || 8;
+
 res.status(200).json({
   n,
   isKnockout,
   probabilities:{winA:+(winsA/n*100).toFixed(1),draw:+(draws/n*100).toFixed(1),winB:+(winsB/n*100).toFixed(1)},
   topScores,
   expectedGoals:+(muA+muB).toFixed(2),
-  mostLikelyScore:{ ga: mlA, gb: mlB, score: mostLikely, pct: topScores[0]?.pct }
-});
-  } catch(err) {
-    res.status(500).json({ error: err.message });
+  mostLikelyScore:{ ga: mlA, gb: mlB, score: mostLikely, pct: topScores[0]?.pct },
+  cornerStats: {
+    mostLikelyTotal: mostLikelyCorners,
+    topTotals: topCornerTotals,
+    topA: topCornersA,
+    topB: topCornersB
   }
-};
+});
