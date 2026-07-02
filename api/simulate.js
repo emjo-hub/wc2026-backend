@@ -150,8 +150,8 @@ module.exports = async function handler(req, res) {
         extraTime, penalties, penaltyWinner,
         winner: finalGa > finalGb ? 'a' : finalGb > finalGa ? 'b' : penaltyWinner
       },
-      teams:{a:{name:teamA,flag:ta.flag,elo:ta.elo,rank:ta.fifa_rank},b:{name:teamB,flag:tb.flag,elo:tb.elo,rank:tb.fifa_rank}},
-      model:{muA,muB,expectedGoals:+(muA+muB).toFixed(2),eloProbs:eloP2},
+teams:{a:{name:teamA,flag:ta.flag,elo:ta.elo,rank:ta.fifa_rank},b:{name:teamB,flag:tb.flag,elo:tb.elo,rank:tb.fifa_rank}},
+penHistory:{a:{wins:parseInt(ta.pen_wins),losses:parseInt(ta.pen_losses)},b:{wins:parseInt(tb.pen_wins),losses:parseInt(tb.pen_losses)}},      model:{muA,muB,expectedGoals:+(muA+muB).toFixed(2),eloProbs:eloP2},
       matrix:matrix.slice(0,5).map(r=>r.slice(0,5)),
       corners, events:ev,
       stats:{possession:{a:possA,b:100-possA},shots:{a:Math.max(3,Math.round(ta.shots_avg*(.85+Math.random()*.3)+ga*1.5)),b:Math.max(3,Math.round(tb.shots_avg*(.85+Math.random()*.3)+gb*1.5))},xg:{a:+muA.toFixed(2),b:+muB.toFixed(2)},ppda:{a:+(ta.ppda*(.92+Math.random()*.16)).toFixed(1),b:+(tb.ppda*(.92+Math.random()*.16)).toFixed(1)},setpieceXg:{a:+(ta.set_piece_xg*(.85+Math.random()*.3)).toFixed(2),b:+(tb.set_piece_xg*(.85+Math.random()*.3)).toFixed(2)}},
