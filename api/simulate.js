@@ -32,6 +32,9 @@ module.exports = async function handler(req, res) {
         t.xg_avg, t.xga_avg, t.ppda, t.possession_avg,
         t.shots_avg, t.set_piece_xg, t.star_player, t.wc_appearances,
         t.recent_form,
+        COALESCE(t.bayes_att, 0) AS bayes_att,
+        COALESCE(t.bayes_def, 0) AS bayes_def,
+        COALESCE(t.bayes_net, 0) AS bayes_net,
         COALESCE(ts.xg_last_5, t.xg_avg) AS xg_recent,
         COALESCE(ts.goals_scored, 0) AS goals_scored,
         COALESCE(ts.points, 0) AS points,
@@ -52,24 +55,20 @@ module.exports = async function handler(req, res) {
 
     const ctx = (context.weather||1)*(context.phase||1)*(context.rest||1);
 
-    // Elo dinámico basado en rendimiento del torneo
+    // Elo dinámico
     const K = 60;
-    const eloBase_a = ta.elo;
-    const eloBase_b = tb.elo;
-    const matchesA = ta.matchday || 0;
-    const matchesB = tb.matchday || 0;
+    const matchesA = parseInt(ta.matchday) || 0;
+    const matchesB = parseInt(tb.matchday) || 0;
     const winRateA = matchesA > 0 ? ta.points / (matchesA * 3) : 0.5;
     const winRateB = matchesB > 0 ? tb.points / (matchesB * 3) : 0.5;
-    const expectedA = 1 / (1 + Math.pow(10, (eloBase_b - eloBase_a) / 400));
+    const expectedA = 1 / (1 + Math.pow(10, (tb.elo - ta.elo) / 400));
     const eloAdjA = Math.round(K * matchesA * (winRateA - expectedA));
     const eloAdjB = Math.round(K * matchesB * (winRateB - expectedA));
-    const elo_a = eloBase_a + eloAdjA;
-    const elo_b = eloBase_b + eloAdjB;
+    const elo_a = ta.elo + eloAdjA;
+    const elo_b = tb.elo + eloAdjB;
     const eloP = eloProbs(elo_a, elo_b);
 
-    // Lambdas con Elo dinámico y forma ponderada
-    const ef = Math.max(-0.8, Math.min(0.8, (elo_a - elo_b) / 600));
-
+    // Forma reciente ponderada
     function weightedXG(t) {
       const m = parseInt(t.matchday) || 0;
       const m1 = parseFloat(t.xg_match1 || 0);
@@ -82,6 +81,7 @@ module.exports = async function handler(req, res) {
       return parseFloat(t.xg_recent || t.xg_avg || 1.2);
     }
 
+    const ef = Math.max(-0.8, Math.min(0.8, (elo_a - elo_b) / 600));
     const xg_a = Math.max(0.3, weightedXG(ta));
     const xg_b = Math.max(0.3, weightedXG(tb));
     const xgDef_a = parseFloat(tb.xga_avg || 1.2);
@@ -89,8 +89,21 @@ module.exports = async function handler(req, res) {
     const pts_a = parseFloat(ta.points || 0);
     const pts_b = parseFloat(tb.points || 0);
 
-    let raw_a = Math.max(0.3, (xg_a * 0.45) + (xgDef_a * 0.20) + (ef * 0.20) + (pts_a * 0.04));
-    let raw_b = Math.max(0.3, (xg_b * 0.45) + (xgDef_b * 0.20) - (ef * 0.20) + (pts_b * 0.04));
+    // Fuerzas Bayesianas
+    const bayes_att_a = parseFloat(ta.bayes_att || 0);
+    const bayes_def_a = parseFloat(ta.bayes_def || 0);
+    const bayes_att_b = parseFloat(tb.bayes_att || 0);
+    const bayes_def_b = parseFloat(tb.bayes_def || 0);
+
+    // Lambda combinado: 40% Bayesiano + 60% modelo actual
+    let raw_a = Math.max(0.3,
+      0.60 * ((xg_a * 0.45) + (xgDef_a * 0.20) + (ef * 0.20) + (pts_a * 0.04)) +
+      0.40 * Math.exp(0.3 + 0.1 + bayes_att_a - bayes_def_b)
+    );
+    let raw_b = Math.max(0.3,
+      0.60 * ((xg_b * 0.45) + (xgDef_b * 0.20) - (ef * 0.20) + (pts_b * 0.04)) +
+      0.40 * Math.exp(0.3 + bayes_att_b - bayes_def_a)
+    );
 
     const total_raw = raw_a + raw_b;
     const phase = parseFloat(context.phase || 1);
@@ -101,7 +114,6 @@ module.exports = async function handler(req, res) {
     const matrix = dcMatrix(muA, muB);
     const {ga, gb} = sampleMat(matrix);
     const corners = simCorners(ta, tb);
-    const eloP2 = eloProbs(elo_a, elo_b);
     const rand=(a,b)=>Math.floor(Math.random()*(b-a+1))+a;
     const ev=[];
     const pA=[ta.star_player,'Delantero','Mediocampista','Extremo','Defensa SP'];
@@ -109,7 +121,8 @@ module.exports = async function handler(req, res) {
     for(let i=0;i<ga;i++){const sp=Math.random()<(ta.set_piece_xg/((ta.xg_avg*1.4)||1))*.5,ph=Math.random(),m=ph<.22?rand(3,22):ph<.52?rand(23,55):ph<.78?rand(56,78):rand(79,95);ev.push({min:m,team:'a',type:sp?'setpiece':'goal',player:pA[i%pA.length]});}
     for(let i=0;i<gb;i++){const sp=Math.random()<(tb.set_piece_xg/((tb.xg_avg*1.4)||1))*.5,ph=Math.random(),m=ph<.18?rand(8,25):ph<.48?rand(26,58):ph<.76?rand(59,82):rand(83,96);ev.push({min:m,team:'b',type:sp?'setpiece':'goal',player:pB[i%pB.length]});}
     ev.sort((a,b)=>a.min-b.min);
-    const eloRatio=ta.elo/(ta.elo+tb.elo),possA=Math.round(Math.max(28,Math.min(72,ta.possession_avg*(0.92+eloRatio*0.16))));
+    const eloRatio=ta.elo/(ta.elo+tb.elo);
+    const possA=Math.round(Math.max(28,Math.min(72,ta.possession_avg*(0.92+eloRatio*0.16))));
 
     // Lógica eliminatoria con historial de penales
     let finalGa = ga, finalGb = gb;
@@ -127,7 +140,6 @@ module.exports = async function handler(req, res) {
 
       if (finalGa === finalGb) {
         penalties = true;
-        // Historial real de penales con suavizado bayesiano
         const penRateA = (parseFloat(ta.pen_wins) + 1.5) / (parseFloat(ta.pen_wins) + parseFloat(ta.pen_losses) + 3);
         const penRateB = (parseFloat(tb.pen_wins) + 1.5) / (parseFloat(tb.pen_wins) + parseFloat(tb.pen_losses) + 3);
         const penProbA = penRateA / (penRateA + penRateB);
@@ -135,12 +147,12 @@ module.exports = async function handler(req, res) {
       }
     }
 
-    // Guardar simulación en historial
+    // Guardar en historial
     try {
       await pool.query(`
         INSERT INTO simulation_history 
         (team_a, team_b, goals_a, goals_b, mu_a, mu_b, phase, extra_time, penalties, penalty_winner, model_used, created_at)
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 'xgboost-dc-v3', NOW())
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 'bayes-dc-v1', NOW())
       `, [teamA, teamB, finalGa, finalGb, muA, muB, context.phase||1, extraTime, penalties, penaltyWinner]);
     } catch(e) { console.error('History error:', e.message); }
 
@@ -150,11 +162,18 @@ module.exports = async function handler(req, res) {
         extraTime, penalties, penaltyWinner,
         winner: finalGa > finalGb ? 'a' : finalGb > finalGa ? 'b' : penaltyWinner
       },
-teams:{a:{name:teamA,flag:ta.flag,elo:ta.elo,rank:ta.fifa_rank},b:{name:teamB,flag:tb.flag,elo:tb.elo,rank:tb.fifa_rank}},
-penHistory:{a:{wins:parseInt(ta.pen_wins),losses:parseInt(ta.pen_losses)},b:{wins:parseInt(tb.pen_wins),losses:parseInt(tb.pen_losses)}},      model:{muA,muB,expectedGoals:+(muA+muB).toFixed(2),eloProbs:eloP2},
+      teams:{a:{name:teamA,flag:ta.flag,elo:ta.elo,rank:ta.fifa_rank},b:{name:teamB,flag:tb.flag,elo:tb.elo,rank:tb.fifa_rank}},
+      penHistory:{a:{wins:parseInt(ta.pen_wins),losses:parseInt(ta.pen_losses)},b:{wins:parseInt(tb.pen_wins),losses:parseInt(tb.pen_losses)}},
+      model:{muA,muB,expectedGoals:+(muA+muB).toFixed(2),eloProbs:eloP},
       matrix:matrix.slice(0,5).map(r=>r.slice(0,5)),
       corners, events:ev,
-      stats:{possession:{a:possA,b:100-possA},shots:{a:Math.max(3,Math.round(ta.shots_avg*(.85+Math.random()*.3)+ga*1.5)),b:Math.max(3,Math.round(tb.shots_avg*(.85+Math.random()*.3)+gb*1.5))},xg:{a:+muA.toFixed(2),b:+muB.toFixed(2)},ppda:{a:+(ta.ppda*(.92+Math.random()*.16)).toFixed(1),b:+(tb.ppda*(.92+Math.random()*.16)).toFixed(1)},setpieceXg:{a:+(ta.set_piece_xg*(.85+Math.random()*.3)).toFixed(2),b:+(tb.set_piece_xg*(.85+Math.random()*.3)).toFixed(2)}},
+      stats:{
+        possession:{a:possA,b:100-possA},
+        shots:{a:Math.max(3,Math.round(ta.shots_avg*(.85+Math.random()*.3)+ga*1.5)),b:Math.max(3,Math.round(tb.shots_avg*(.85+Math.random()*.3)+gb*1.5))},
+        xg:{a:+muA.toFixed(2),b:+muB.toFixed(2)},
+        ppda:{a:+(ta.ppda*(.92+Math.random()*.16)).toFixed(1),b:+(tb.ppda*(.92+Math.random()*.16)).toFixed(1)},
+        setpieceXg:{a:+(ta.set_piece_xg*(.85+Math.random()*.3)).toFixed(2),b:+(tb.set_piece_xg*(.85+Math.random()*.3)).toFixed(2)}
+      },
     });
   } catch(err) {
     console.error(err);
