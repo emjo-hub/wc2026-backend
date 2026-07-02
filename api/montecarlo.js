@@ -14,7 +14,7 @@ module.exports = async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
   try {
-    const { muA, muB, n = 50000, isKnockout = false, eloA = 1800, eloB = 1800, possA = 50, possB = 50, ppdaA = 10, ppdaB = 10 } = req.body;
+    const { muA, muB, n = 50000, isKnockout = false, eloA = 1800, eloB = 1800, possA = 50, possB = 50, ppdaA = 10, ppdaB = 10, penWinsA = 1, penLossesA = 1, penWinsB = 1, penLossesB = 1 } = req.body;
     let winsA=0, draws=0, winsB=0;
     const sf={};
 
@@ -32,9 +32,11 @@ module.exports = async function handler(req, res) {
         ga += et.ga;
         gb += et.gb;
         if (ga === gb) {
-          const eloAdv = Math.max(-0.1, Math.min(0.1, (eloA - eloB) / 4000));
-          if (Math.random() < 0.50 + eloAdv) ga += 0.1;
-          else gb += 0.1;
+          const penRateA = (penWinsA + 1.5) / (penWinsA + penLossesA + 3);
+const penRateB = (penWinsB + 1.5) / (penWinsB + penLossesB + 3);
+const penProbA = penRateA / (penRateA + penRateB);
+if (Math.random() < penProbA) ga += 0.1;
+else gb += 0.1;
         }
       }
 
