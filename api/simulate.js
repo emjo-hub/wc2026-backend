@@ -35,6 +35,7 @@ module.exports = async function handler(req, res) {
         COALESCE(t.bayes_att, 0) AS bayes_att,
         COALESCE(t.bayes_def, 0) AS bayes_def,
         COALESCE(t.bayes_net, 0) AS bayes_net,
+        COALESCE(t.tactical_ratio, 1.0) AS tactical_ratio,
         COALESCE(ts.xg_last_5, t.xg_avg) AS xg_recent,
         COALESCE(ts.goals_scored, 0) AS goals_scored,
         COALESCE(ts.points, 0) AS points,
@@ -95,14 +96,18 @@ module.exports = async function handler(req, res) {
     const bayes_att_b = parseFloat(tb.bayes_att || 0);
     const bayes_def_b = parseFloat(tb.bayes_def || 0);
 
-    // Lambda combinado: 40% Bayesiano + 60% modelo actual
+    // Índice táctico
+    const tact_a = Math.max(0.5, Math.min(1.5, parseFloat(ta.tactical_ratio || 1.0)));
+    const tact_b = Math.max(0.5, Math.min(1.5, parseFloat(tb.tactical_ratio || 1.0)));
+
+    // Lambda combinado: 40% Bayesiano + 60% modelo actual + ajuste táctico
     let raw_a = Math.max(0.3,
-      0.60 * ((xg_a * 0.45) + (xgDef_a * 0.20) + (ef * 0.20) + (pts_a * 0.04)) +
-      0.40 * Math.exp(0.3 + 0.1 + bayes_att_a - bayes_def_b)
+      (0.60 * ((xg_a * 0.45) + (xgDef_a * 0.20) + (ef * 0.20) + (pts_a * 0.04)) +
+      0.40 * Math.exp(0.3 + 0.1 + bayes_att_a - bayes_def_b)) * tact_a
     );
     let raw_b = Math.max(0.3,
-      0.60 * ((xg_b * 0.45) + (xgDef_b * 0.20) - (ef * 0.20) + (pts_b * 0.04)) +
-      0.40 * Math.exp(0.3 + bayes_att_b - bayes_def_a)
+      (0.60 * ((xg_b * 0.45) + (xgDef_b * 0.20) - (ef * 0.20) + (pts_b * 0.04)) +
+      0.40 * Math.exp(0.3 + bayes_att_b - bayes_def_a)) * tact_b
     );
 
     const total_raw = raw_a + raw_b;
@@ -152,7 +157,7 @@ module.exports = async function handler(req, res) {
       await pool.query(`
         INSERT INTO simulation_history 
         (team_a, team_b, goals_a, goals_b, mu_a, mu_b, phase, extra_time, penalties, penalty_winner, model_used, created_at)
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 'bayes-dc-v1', NOW())
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 'bayes-dc-tact-v1', NOW())
       `, [teamA, teamB, finalGa, finalGb, muA, muB, context.phase||1, extraTime, penalties, penaltyWinner]);
     } catch(e) { console.error('History error:', e.message); }
 
