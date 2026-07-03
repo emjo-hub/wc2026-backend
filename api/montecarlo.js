@@ -68,6 +68,9 @@ const cb = pSample(Math.max(0.5,(possB/100)*4.5*pfB)) + pSample(Math.max(0.5,(po
     const topCornerTotals = Object.entries(cornerTotals).sort((a,b)=>b[1]-a[1]).slice(0,6).map(([v,c])=>({value:+v,pct:+(c/n*100).toFixed(1)}));
     const topCornersA = Object.entries(cornerA).sort((a,b)=>b[1]-a[1]).slice(0,4).map(([v,c])=>({value:+v,pct:+(c/n*100).toFixed(1)}));
     const topCornersB = Object.entries(cornerB).sort((a,b)=>b[1]-a[1]).slice(0,4).map(([v,c])=>({value:+v,pct:+(c/n*100).toFixed(1)}));
+const over25 = +(Object.entries(sf).filter(([s])=>{
+      const[a,b]=s.split('-').map(Number);return(a+b)>2;
+    }).reduce((sum,[,c])=>sum+c,0)/n*100).toFixed(1);
 
     res.status(200).json({
       n, isKnockout,
@@ -75,6 +78,7 @@ const cb = pSample(Math.max(0.5,(possB/100)*4.5*pfB)) + pSample(Math.max(0.5,(po
       topScores,
       expectedGoals:+(muA+muB).toFixed(2),
       mostLikelyScore:{ ga: mlA, gb: mlB, score: mostLikely, pct: topScores[0]?.pct },
+      over25,
       cornerStats: {
         mostLikelyTotal: topCornerTotals[0]?.value || 8,
         topTotals: topCornerTotals,
