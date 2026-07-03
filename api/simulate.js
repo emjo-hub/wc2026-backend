@@ -97,8 +97,11 @@ module.exports = async function handler(req, res) {
     const bayes_def_b = parseFloat(tb.bayes_def || 0);
 
     // Índice táctico
-    const tact_a = Math.max(0.5, Math.min(1.5, parseFloat(ta.tactical_ratio || 1.0)));
-    const tact_b = Math.max(0.5, Math.min(1.5, parseFloat(tb.tactical_ratio || 1.0)));
+    // Índice táctico suavizado — peso reducido para no distorsionar
+const tact_raw_a = parseFloat(ta.tactical_ratio || 1.0);
+const tact_raw_b = parseFloat(tb.tactical_ratio || 1.0);
+const tact_a = Math.max(0.85, Math.min(1.15, 0.7 + tact_raw_a * 0.3));
+const tact_b = Math.max(0.85, Math.min(1.15, 0.7 + tact_raw_b * 0.3));
 
     // Lambda combinado: 40% Bayesiano + 60% modelo actual + ajuste táctico
     let raw_a = Math.max(0.3,
