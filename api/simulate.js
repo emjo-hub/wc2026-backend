@@ -115,7 +115,7 @@ const tact_b = Math.max(0.85, Math.min(1.15, 0.7 + tact_raw_b * 0.3));
 
     const total_raw = raw_a + raw_b;
     const phase = parseFloat(context.phase || 1);
-    const TARGET = phase >= 1.15 ? 2.35 : phase >= 1.12 ? 2.40 : phase >= 1.09 ? 2.48 : phase >= 1.05 ? 2.60 : 2.99;
+    const TARGET = phase >= 1.15 ? 2.35 : phase >= 1.09 ? 2.45 : phase >= 1.05 ? 2.52 : 2.60;
     const muA = Math.max(0.4, parseFloat((raw_a / total_raw * TARGET * ctx).toFixed(3)));
     const muB = Math.max(0.35, parseFloat((raw_b / total_raw * TARGET * ctx).toFixed(3)));
 
