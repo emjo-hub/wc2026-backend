@@ -64,7 +64,8 @@ module.exports = async function handler(req, res) {
     const winRateB = matchesB > 0 ? tb.points / (matchesB * 3) : 0.5;
     const expectedA = 1 / (1 + Math.pow(10, (tb.elo - ta.elo) / 400));
     const eloAdjA = Math.round(K * matchesA * (winRateA - expectedA));
-    const eloAdjB = Math.round(K * matchesB * (winRateB - expectedA));
+    const expectedB = 1 - expectedA;
+const eloAdjB = Math.round(K * matchesB * (winRateB - expectedB));
     const elo_a = ta.elo + eloAdjA;
     const elo_b = tb.elo + eloAdjB;
     const eloP = eloProbs(elo_a, elo_b);
@@ -106,7 +107,7 @@ const tact_b = Math.max(0.85, Math.min(1.15, 0.7 + tact_raw_b * 0.3));
     // Lambda combinado: 40% Bayesiano + 60% modelo actual + ajuste táctico
     let raw_a = Math.max(0.3,
       (0.60 * ((xg_a * 0.45) + (xgDef_a * 0.20) + (ef * 0.20) + (pts_a * 0.04)) +
-      0.40 * Math.exp(0.3 + 0.1 + bayes_att_a - bayes_def_b)) * tact_a
+      0.40 * Math.exp(0.3 + bayes_att_a - bayes_def_b)) * tact_a
     );
     let raw_b = Math.max(0.3,
       (0.60 * ((xg_b * 0.45) + (xgDef_b * 0.20) - (ef * 0.20) + (pts_b * 0.04)) +
