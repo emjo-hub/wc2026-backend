@@ -77,6 +77,8 @@ module.exports = async function handler(req, res) {
   const m3 = parseFloat(t.xg_match3 || 0);
   const m4 = parseFloat(t.xg_match4 || 0);
   const m5 = parseFloat(t.xg_match5 || 0);
+  const m6 = parseFloat(t.xg_match6 || 0);
+  if (m >= 6) return (m1*0.03 + m2*0.07 + m3*0.15 + m4*0.25 + m5*0.25 + m6*0.25);
   if (m >= 5) return (m1*0.05 + m2*0.10 + m3*0.20 + m4*0.30 + m5*0.35);
   if (m >= 4) return (m1*0.10 + m2*0.20 + m3*0.30 + m4*0.40);
   if (m === 3) return (m1*0.20 + m2*0.35 + m3*0.45);
