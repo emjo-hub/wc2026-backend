@@ -108,14 +108,17 @@ const tact_a = Math.max(0.85, Math.min(1.15, 0.7 + tact_raw_a * 0.3));
 const tact_b = Math.max(0.85, Math.min(1.15, 0.7 + tact_raw_b * 0.3));
 
     // Lambda combinado: 40% Bayesiano + 60% modelo actual + ajuste táctico
-    let raw_a = Math.max(0.3,
-      (0.60 * ((xg_a * 0.45) + (xgDef_a * 0.20) + (ef * 0.20) + (pts_a * 0.04)) +
-      0.40 * Math.exp(0.3 + 0.1 + bayes_att_a - bayes_def_b)) * tact_a
-    );
-    let raw_b = Math.max(0.3,
-      (0.60 * ((xg_b * 0.45) + (xgDef_b * 0.20) - (ef * 0.20) + (pts_b * 0.04)) +
-      0.40 * Math.exp(0.3 + bayes_att_b - bayes_def_a)) * tact_b
-    );
+    const bayesWeight = phase >= 1.12 ? 0.70 : phase >= 1.05 ? 0.55 : 0.40;
+const classicWeight = 1 - bayesWeight;
+
+let raw_a = Math.max(0.3,
+  (classicWeight * ((xg_a * 0.45) + (xgDef_a * 0.20) + (ef * 0.20) + (pts_a * 0.04)) +
+  bayesWeight * Math.exp(0.3 + 0.1 + bayes_att_a - bayes_def_b)) * tact_a
+);
+let raw_b = Math.max(0.3,
+  (classicWeight * ((xg_b * 0.45) + (xgDef_b * 0.20) - (ef * 0.20) + (pts_b * 0.04)) +
+  bayesWeight * Math.exp(0.3 + bayes_att_b - bayes_def_a)) * tact_b
+);
 
     const total_raw = raw_a + raw_b;
     const phase = parseFloat(context.phase || 1);
