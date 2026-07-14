@@ -40,7 +40,7 @@ module.exports = async function handler(req, res) {
         COALESCE(ts.goals_scored, 0) AS goals_scored,
         COALESCE(ts.points, 0) AS points,
         COALESCE(ts.matchday, 0) AS matchday,
-        ts.xg_match1, ts.xg_match2, ts.xg_match3, ts.xg_match4,
+        ts.xg_match1, ts.xg_match2, ts.xg_match3, ts.xg_match4, ts.xg_match5, ts.xg_match6,
         COALESCE(ph.wins, 1) AS pen_wins,
         COALESCE(ph.losses, 1) AS pen_losses
       FROM teams t 
@@ -55,6 +55,8 @@ module.exports = async function handler(req, res) {
     if (!tb) return res.status(404).json({ error: `Equipo no encontrado: ${teamB}` });
 
     const ctx = (context.weather||1)*(context.phase||1)*(context.rest||1);
+    const phase = parseFloat(context.phase || 1);
+    const TARGET = phase >= 1.18 ? 2.15 : phase >= 1.15 ? 2.25 : phase >= 1.09 ? 2.45 : phase >= 1.05 ? 2.52 : 2.60;
 
     // Elo dinámico
     const K = 60;
@@ -71,20 +73,20 @@ module.exports = async function handler(req, res) {
 
     // Forma reciente ponderada
     function weightedXG(t) {
-  const m = parseInt(t.matchday) || 0;
-  const m1 = parseFloat(t.xg_match1 || 0);
-  const m2 = parseFloat(t.xg_match2 || 0);
-  const m3 = parseFloat(t.xg_match3 || 0);
-  const m4 = parseFloat(t.xg_match4 || 0);
-  const m5 = parseFloat(t.xg_match5 || 0);
-  const m6 = parseFloat(t.xg_match6 || 0);
-  if (m >= 6) return (m1*0.03 + m2*0.07 + m3*0.15 + m4*0.25 + m5*0.25 + m6*0.25);
-  if (m >= 5) return (m1*0.05 + m2*0.10 + m3*0.20 + m4*0.30 + m5*0.35);
-  if (m >= 4) return (m1*0.10 + m2*0.20 + m3*0.30 + m4*0.40);
-  if (m === 3) return (m1*0.20 + m2*0.35 + m3*0.45);
-  if (m === 2) return (m1*0.40 + m2*0.60);
-  return parseFloat(t.xg_recent || t.xg_avg || 1.2);
-}
+      const m = parseInt(t.matchday) || 0;
+      const m1 = parseFloat(t.xg_match1 || 0);
+      const m2 = parseFloat(t.xg_match2 || 0);
+      const m3 = parseFloat(t.xg_match3 || 0);
+      const m4 = parseFloat(t.xg_match4 || 0);
+      const m5 = parseFloat(t.xg_match5 || 0);
+      const m6 = parseFloat(t.xg_match6 || 0);
+      if (m >= 6) return (m1*0.03 + m2*0.07 + m3*0.15 + m4*0.25 + m5*0.25 + m6*0.25);
+      if (m >= 5) return (m1*0.05 + m2*0.10 + m3*0.20 + m4*0.30 + m5*0.35);
+      if (m >= 4) return (m1*0.10 + m2*0.20 + m3*0.30 + m4*0.40);
+      if (m === 3) return (m1*0.20 + m2*0.35 + m3*0.45);
+      if (m === 2) return (m1*0.40 + m2*0.60);
+      return parseFloat(t.xg_recent || t.xg_avg || 1.2);
+    }
 
     const ef = Math.max(-0.8, Math.min(0.8, (elo_a - elo_b) / 600));
     const xg_a = Math.max(0.3, weightedXG(ta));
@@ -100,29 +102,26 @@ module.exports = async function handler(req, res) {
     const bayes_att_b = parseFloat(tb.bayes_att || 0);
     const bayes_def_b = parseFloat(tb.bayes_def || 0);
 
-    // Índice táctico
-    // Índice táctico suavizado — peso reducido para no distorsionar
-const tact_raw_a = parseFloat(ta.tactical_ratio || 1.0);
-const tact_raw_b = parseFloat(tb.tactical_ratio || 1.0);
-const tact_a = Math.max(0.85, Math.min(1.15, 0.7 + tact_raw_a * 0.3));
-const tact_b = Math.max(0.85, Math.min(1.15, 0.7 + tact_raw_b * 0.3));
+    // Índice táctico suavizado
+    const tact_raw_a = parseFloat(ta.tactical_ratio || 1.0);
+    const tact_raw_b = parseFloat(tb.tactical_ratio || 1.0);
+    const tact_a = Math.max(0.85, Math.min(1.15, 0.7 + tact_raw_a * 0.3));
+    const tact_b = Math.max(0.85, Math.min(1.15, 0.7 + tact_raw_b * 0.3));
 
-    // Lambda combinado: 40% Bayesiano + 60% modelo actual + ajuste táctico
+    // Peso Bayesiano aumenta en fases avanzadas
     const bayesWeight = phase >= 1.12 ? 0.70 : phase >= 1.05 ? 0.55 : 0.40;
-const classicWeight = 1 - bayesWeight;
+    const classicWeight = 1 - bayesWeight;
 
-let raw_a = Math.max(0.3,
-  (classicWeight * ((xg_a * 0.45) + (xgDef_a * 0.20) + (ef * 0.20) + (pts_a * 0.04)) +
-  bayesWeight * Math.exp(0.3 + 0.1 + bayes_att_a - bayes_def_b)) * tact_a
-);
-let raw_b = Math.max(0.3,
-  (classicWeight * ((xg_b * 0.45) + (xgDef_b * 0.20) - (ef * 0.20) + (pts_b * 0.04)) +
-  bayesWeight * Math.exp(0.3 + bayes_att_b - bayes_def_a)) * tact_b
-);
+    let raw_a = Math.max(0.3,
+      (classicWeight * ((xg_a * 0.45) + (xgDef_a * 0.20) + (ef * 0.20) + (pts_a * 0.04)) +
+      bayesWeight * Math.exp(0.3 + 0.1 + bayes_att_a - bayes_def_b)) * tact_a
+    );
+    let raw_b = Math.max(0.3,
+      (classicWeight * ((xg_b * 0.45) + (xgDef_b * 0.20) - (ef * 0.20) + (pts_b * 0.04)) +
+      bayesWeight * Math.exp(0.3 + bayes_att_b - bayes_def_a)) * tact_b
+    );
 
     const total_raw = raw_a + raw_b;
-    const phase = parseFloat(context.phase || 1);
-    const TARGET = phase >= 1.15 ? 2.35 : phase >= 1.09 ? 2.45 : phase >= 1.05 ? 2.52 : 2.60;
     const muA = Math.max(0.4, parseFloat((raw_a / total_raw * TARGET * ctx).toFixed(3)));
     const muB = Math.max(0.35, parseFloat((raw_b / total_raw * TARGET * ctx).toFixed(3)));
 
@@ -167,7 +166,7 @@ let raw_b = Math.max(0.3,
       await pool.query(`
         INSERT INTO simulation_history 
         (team_a, team_b, goals_a, goals_b, mu_a, mu_b, phase, extra_time, penalties, penalty_winner, model_used, created_at)
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 'bayes-dc-tact-v1', NOW())
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 'bayes-dc-final-v1', NOW())
       `, [teamA, teamB, finalGa, finalGb, muA, muB, context.phase||1, extraTime, penalties, penaltyWinner]);
     } catch(e) { console.error('History error:', e.message); }
 
